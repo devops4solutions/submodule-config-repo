@@ -1,0 +1,58 @@
+# Deployment related variables
+HELM_RELEASE_NAME := $(TARGET_PROJECT)-$(TARGET_ENVIRONMENT)
+HELM_CHART_NAME := stable/wordpress
+HELM_CHART_VALUES_FILE := ./deploy/values-$(TARGET_ENVIRONMENT).yaml
+HELM_TIMEOUT_PERIOD := 10m30s
+HELM_CHART_VERSION := 8.1.6
+
+# Asset storage variables
+ASSETS_PROJECT_NAME := $(TARGET_PROJECT)
+ASSETS_DATABASE_FILE := latest-$(TARGET_ENVIRONMENT).sql
+
+# Docker registry information
+DOCKER_REGISTRY_HOST := gcr.io
+DOCKER_REGISTRY_PROJECT := www-hosting-dev-6172682f
+
+
+# Base image tags
+DOCKER_BASE_IMAGE_LOCAL_TAG = $(DOCKER_IMAGE_ORG)/$(DOCKER_BASE_IMAGE_NAME):$(DOCKER_BASE_IMAGE_VERSION)
+DOCKER_BASE_IMAGE_REGISTRY_PATH = $(DOCKER_REGISTRY_HOST)/$(DOCKER_REGISTRY_PROJECT)/$(DOCKER_BASE_IMAGE_NAME)
+
+COMMIT_TAG ?= $(CI_COMMIT_TAG)
+COMMIT_SHA ?= $(CI_COMMIT_SHORT_SHA)
+
+# When running in CI, use external environment variables to set release version and tags
+ifeq ($(CI_SERVER),  yes)
+  ifneq ($(COMMIT_TAG),)
+    RELEASE_VERSION = $(COMMIT_TAG)
+    RELEASE_TAG = $(TARGET_ENVIRONMENT)
+  else ifneq ($(COMMIT_SHA),)
+    RELEASE_VERSION = $(COMMIT_SHA)
+    RELEASE_TAG = latest
+  else
+    RELEASE_VERSION = $(TARGET_VERSION)
+    RELEASE_TAG = ci
+  endif
+else
+  RELEASE_VERSION = $(TARGET_VERSION)
+  RELEASE_TAG = latest
+endif
+
+# Fully computed strings to use for tagging docker builds
+DOCKER_IMAGE_LOCAL_TAG = $(DOCKER_IMAGE_ORG)/$(DOCKER_IMAGE_NAME):$(RELEASE_TAG)
+DOCKER_IMAGE_RELEASE_BASE_TAG = $(DOCKER_REGISTRY_HOST)/$(DOCKER_REGISTRY_PROJECT)/$(DOCKER_IMAGE_NAME)
+DOCKER_IMAGE_RELEASE_VERSION_TAG = $(DOCKER_IMAGE_RELEASE_BASE_TAG):$(RELEASE_VERSION)
+
+# Only set this if we are in fact building the latest image
+DOCKER_IMAGE_RELEASE_LATEST_TAG = $(DOCKER_IMAGE_RELEASE_BASE_TAG):$(RELEASE_TAG)
+
+# Used for post-deployment steps
+K8S_WP_POD_LABEL=$(TARGET_PROJECT)-$(TARGET_ENVIRONMENT)-wordpress
+K8S_DB_POD_LABEL=$(TARGET_PROJECT)-$(TARGET_ENVIRONMENT)-mariadb
+
+# Set environment conditional variables here
+ifeq ($(TARGET_ENVIRONMENT), dev)
+  HELM_EXTRA_ARGS := "--set image.tag=$(RELEASE_VERSION) --atomic --timeout $(HELM_TIMEOUT_PERIOD) --version $(HELM_CHART_VERSION)"
+else ifeq ($(TARGET_ENVIRONMENT), stg)
+  HELM_EXTRA_ARGS := "--set image.tag=$(RELEASE_VERSION) --atomic --timeout $(HELM_TIMEOUT_PERIOD) --version $(HELM_CHART_VERSION)"
+endif

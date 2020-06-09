@@ -1,0 +1,18 @@
+version: '2'
+services:
+  mariadb:
+    image: 'bitnami/mariadb:10.3'
+    volumes:
+      - 'mariadb_data:/bitnami'   
+  wordpress:
+    image: 'bitnami/wordpress:5-debian-10'
+    ports:
+      - '8080:80'
+      - '8443:443'
+    depends_on:
+      - mariadbs
+volumes:
+  mariadb_data:
+    driver: local
+  wordpress_data:
+    driver: local
